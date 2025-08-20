@@ -1,5 +1,8 @@
 const $imagen = document.querySelector("#imagen");
 const $canvas = document.querySelector("#canvas");
+const $alto = document.querySelector("#alto");
+const $ancho = document.querySelector("#ancho");
+$ancho.value = 384; // Por defecto para 58mm
 $imagen.addEventListener("change", async () => {
   if ($imagen.files.length <= 0) {
     return;
@@ -7,9 +10,11 @@ $imagen.addEventListener("change", async () => {
   const primeraImagen = $imagen.files[0];
   const contexto = $canvas.getContext("2d");
   const imagen = await createImageBitmap(primeraImagen, {})
-  const medida = 700;
-  const alto = 500;
-  const ancho = 384;
+  // El papel térmico no tiene un límite en su alto
+  $alto.value = imagen.height;
+
+  const alto = $alto.valueAsNumber;
+  const ancho = $ancho.valueAsNumber;
   for (let x = 0; x < imagen.width; x += ancho) {
     for (let y = 0; y < imagen.height; y += alto) {
       let anchoPedazo = x + ancho;
@@ -20,33 +25,63 @@ $imagen.addEventListener("change", async () => {
       if (y + alto > imagen.height) {
         altoPedazo = imagen.height;
       }
-      const elCanvas = Object.assign(document.createElement("canvas"), {
-        height: altoPedazo-y,
-        width: anchoPedazo-x,
-      });
-      elCanvas.getContext("2d").drawImage(imagen, x, y, anchoPedazo, altoPedazo, 0, 0, anchoPedazo, altoPedazo);
-      document.body.append(elCanvas);
-      console.log("Cortamos desde %o,%o hasta %o,%o", x, y, anchoPedazo, altoPedazo);
+      const offscreenCanvas = new OffscreenCanvas(anchoPedazo - x, altoPedazo - y);
+      offscreenCanvas.getContext("2d").drawImage(imagen, x, y, anchoPedazo, altoPedazo, 0, 0, anchoPedazo, altoPedazo);
+      const pedazoDeImagenComoBlob = await offscreenCanvas.convertToBlob();
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const cargaUtil = {
+          "serial": "",
+          // TODO: poner select de impresoras
+          "nombreImpresora": "PT",
+          "operaciones": [
+            {
+              "nombre": "Iniciar",
+              "argumentos": []
+            },
+            {
+              "nombre": "ImprimirImagenEnBase64",
+              "argumentos": [
+                reader.result,
+                anchoPedazo - x,
+                0,
+                true
+              ]
+            },
+            // Un Feed por si no tienen cortador
+            {
+              "nombre": "Feed",
+              "argumentos": [1],
+            },
+            {
+              "nombre": "Corte",
+              "argumentos": [
+                1
+              ]
+            }
+          ]
+        };
+        const respuestaHttp = await fetch("http://localhost:8000/imprimir",
+          {
+            method: "POST",
+            body: JSON.stringify(cargaUtil),
+          });
+
+        const respuestaComoJson = await respuestaHttp.json();
+        if (respuestaComoJson.ok) {
+          // Todo bien
+          console.log("Impreso correctamente");
+        } else {
+          // El error está en la propiedad message
+          console.error(respuestaComoJson.message)
+        }
+
+      }
+      reader.onerror = () => {
+        console.error(reader.error);
+      }
+      reader.readAsDataURL(pedazoDeImagenComoBlob);
     }
   }
-  return;
-  $canvas.width = ancho;
-  $canvas.height = alto;
-  /**
-   * Sería: al canvas ponerle la medida del pedazo
-   * Convertirla a base64 e imprimirla
-   * De hecho podríamos usar un OffscreenCanvas aunque estaría bien
-   * previsualizar el resultado y hasta poner un antes y un después o
-   * sea poner que quieres imprimir la pieza 1, pieza 2, etcétera
-   */
-  contexto.drawImage(imagen, 0, 0, ancho, alto, 0, 0, ancho, alto)
-  return;
-  let enlace = document.createElement('a');
-  // El título
-  enlace.download = "Canvas como imagen.jpg";
-  // Convertir la imagen a Base64 y ponerlo en el enlace
-  enlace.href = $canvas.toDataURL("image/jpeg", 1);
-  // Hacer click en él
-  enlace.click();
 
 })
