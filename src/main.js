@@ -28,64 +28,64 @@ const llenarSelectImpresoras = async () => {
   }
 }
 llenarSelectImpresoras();
-const imprimirFragmentoDeImagen = (nombreImpresora, pedazoDeImagenComoBlob, anchoPedazo, x) => {
+const imprimirFragmentoDeImagen = (coleccionDeCanvas) => {
+  const nombreImpresora = $impresoras.value;
   return new Promise(async (resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const cargaUtil = {
-        "serial": "",
-        "nombreImpresora": nombreImpresora,
-        "operaciones": [
-          {
-            "nombre": "Iniciar",
-            "argumentos": []
-          },
-          {
-            "nombre": "ImprimirImagenEnBase64",
-            "argumentos": [
-              reader.result,
-              anchoPedazo - x,
-              0,
-              true
-            ]
-          },
-          // Un Feed por si no tienen cortador
-          {
-            "nombre": "Feed",
-            "argumentos": [1],
-          },
-          {
-            "nombre": "Corte",
-            "argumentos": [
-              1
-            ]
-          }
+    const operaciones = [
+      {
+        "nombre": "Iniciar",
+        "argumentos": []
+      },
+    ];
+    const canvasComoOperaciones = coleccionDeCanvas.map($canvas => {
+      return {
+        nombre: "ImprimirImagenEnBase64",
+        argumentos: [
+          $canvas.toDataURL(),
+          $canvas.width,
+          0,
+          true
         ]
       };
-      try {
-
-        const respuestaHttp = await fetch("http://localhost:8000/imprimir",
-          {
-            method: "POST",
-            body: JSON.stringify(cargaUtil),
-          });
-
-        const respuestaComoJson = await respuestaHttp.json();
-        if (respuestaComoJson.ok) {
-          resolve();
-        } else {
-          // El error está en la propiedad message
-          reject(respuestaComoJson)
-        }
-      } catch (e) {
-        reject(e)
+    })
+    operaciones.push(...canvasComoOperaciones);
+    operaciones.push(
+      // Un Feed por si no tienen cortador
+      {
+        "nombre": "Feed",
+        "argumentos": [1],
+      },
+      {
+        "nombre": "Corte",
+        "argumentos": [
+          1
+        ]
       }
+    )
+    const cargaUtil = {
+      "serial": "",
+      nombreImpresora,
+      operaciones,
+    };
+    try {
+      registrarMensaje("Imprimiendo ...");
+      const respuestaHttp = await fetch("http://localhost:8000/imprimir",
+        {
+          method: "POST",
+          body: JSON.stringify(cargaUtil),
+        });
 
+      const respuestaComoJson = await respuestaHttp.json();
+      if (respuestaComoJson.ok) {
+        registrarMensaje("Impreso correctamente");
+        resolve();
+      } else {
+        // El error está en la propiedad message
+        reject(respuestaComoJson)
+      }
+    } catch (e) {
+      reject(e)
     }
-    reader.onerror = () => {
-      reject(reader.error)
-    }
-    reader.readAsDataURL(pedazoDeImagenComoBlob);
   })
 }
 
@@ -114,23 +114,51 @@ const generarCanvasPrevisualizaciones = async () => {
       }
       const $divContenedorDeCanvas = document.createElement("div");
       $divContenedorDeCanvas.classList.add("border", "border-blue-200", "rounded-md", "relative", "inline-block");
-      const $p = document.createElement("p");
-      $p.textContent = `#${numeroImagen} (Desde ${x},${y} hasta ${xFinalFragmento},${yFinalFragmento}). Clic para descargar`
-
-      $p.classList.add(
-        "cursor-pointer",
+      const $divAcciones = document.createElement("div");
+      $divAcciones.classList.add(
         "absolute",
         "top-0",
         "left-0",
         "text-white",
-        "bg-black/50",
-        "p-1"
+        "bg-black/20",
+        "p-2"
+      )
+      const $pDetalles = document.createElement("p");
+      $pDetalles.textContent = `#${numeroImagen} (Desde ${x},${y} hasta ${xFinalFragmento},${yFinalFragmento})`;
+
+      const $pDescargar = document.createElement("p");
+      $pDescargar.textContent = `Descargar`;
+
+      $pDescargar.classList.add(
+        "cursor-pointer",
+        "underline",
+        "hover:font-bold"
       );
-      $p.addEventListener("click", ()=>{
-        // TODO: descargar
+      $pDescargar.addEventListener("click", () => {
         console.log("Descargamos")
+        let enlace = document.createElement('a');
+        enlace.download = "Canvas como imagen.jpg";
+        enlace.href = $canvasFragmento.toDataURL("image/jpeg", 1);
+        enlace.click();
       })
-      $divContenedorDeCanvas.appendChild($p);
+
+
+
+      const $pImprimir = document.createElement("p");
+      $pImprimir.textContent = `Imprimir`;
+
+      $pImprimir.classList.add(
+        "cursor-pointer",
+        "underline",
+        "hover:font-bold"
+      );
+      $pImprimir.addEventListener("click", async () => {
+        await imprimirFragmentoDeImagen([$canvasFragmento]);
+      })
+      $divAcciones.appendChild($pDetalles);
+      $divAcciones.appendChild($pDescargar);
+      $divAcciones.appendChild($pImprimir);
+      $divContenedorDeCanvas.appendChild($divAcciones);
       const $canvasFragmento = document.createElement("canvas");
       $canvasFragmento.width = ancho;
       $canvasFragmento.height = alto;
@@ -160,44 +188,6 @@ $imprimir.addEventListener("click", async () => {
     registrarMensaje("No has seleccionado ninguna impresora");
     return;
   }
-  const primeraImagen = $imagen.files[0];
-  const imagen = await createImageBitmap(primeraImagen, {})
-  // El papel térmico no tiene un límite en su alto
-  $alto.value = imagen.height;
-
-  const alto = $alto.valueAsNumber;
-  const ancho = $ancho.valueAsNumber;
-  for (let x = 0; x < imagen.width; x += ancho) {
-    for (let y = 0; y < imagen.height; y += alto) {
-      let anchoPedazo = x + ancho;
-      let altoPedazo = y + alto;
-      if (x + ancho > imagen.width) {
-        anchoPedazo = imagen.width;
-      }
-      if (y + alto > imagen.height) {
-        altoPedazo = imagen.height;
-      }
-      const offscreenCanvas = new OffscreenCanvas(anchoPedazo - x, altoPedazo - y);
-      offscreenCanvas.getContext("2d").drawImage(imagen, x, y, anchoPedazo, altoPedazo, 0, 0, anchoPedazo, altoPedazo);
-      const pedazoDeImagenComoBlob = await offscreenCanvas.convertToBlob();
-      try {
-        await imprimirFragmentoDeImagen($impresoras.value, pedazoDeImagenComoBlob, anchoPedazo, x);
-        const $canvasFragmento = document.createElement("canvas");
-        $canvasFragmento.width = anchoPedazo;
-        $canvasFragmento.height = altoPedazo;
-        const contextoCanvasRecienCreado = $canvasFragmento.getContext("2d");
-        contextoCanvasRecienCreado.drawImage(await createImageBitmap(pedazoDeImagenComoBlob), 0, 0);
-        contextoCanvasRecienCreado.font = "20px Arial";
-        contextoCanvasRecienCreado.fillStyle = "blue";
-        contextoCanvasRecienCreado.fillText("Qué tranza", 20, 50);
-        document.body.append($canvasFragmento);
-
-        registrarMensaje(`Impreso fragmento desde ${x},${y} hasta ${x + anchoPedazo},${y + altoPedazo}`);
-      } catch (e) {
-        console.log(e)
-        registrarMensaje(e.message);
-        return
-      }
-    }
-  }
+  const todosLosCanvas = document.querySelectorAll("canvas");
+  await imprimirFragmentoDeImagen([...todosLosCanvas]);
 })

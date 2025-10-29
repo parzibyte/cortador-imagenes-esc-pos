@@ -23,15 +23,21 @@
     <input class="border-blue-200 border-2 max-w-max p-2 hover:border-blue-500 hover:cursor-pointer rounded-md "
       type="file" id="imagen" accept="image/png,image/jpeg,image/webp,image/avif">
     <p class="font-bold">Paso 2: configura el ancho y alto según tu impresora térmica</p>
-    <div class="flex flex-row">
-      <input id="alto"
-        class=" border-2 border-blue-200 rounded-md p-2 hover:border-blue-500 outline-none mr-2 focus:border-blue-500"
-        id="alto" type="number" placeholder="Alto">
-      <input id="ancho"
-        class="border-2 border-blue-200 rounded-md p-2 hover:border-blue-500 outline-none mr-2 focus:border-blue-500"
-        id="alto" type="number" placeholder="Ancho">
+    <div class="flex md:flex-row flex-col">
+      <div class="flex flex-col">
+        <label for="alto" class="font-bold">Alto</label>
+        <input id="alto"
+          class=" border-2 border-blue-200 rounded-md p-2 hover:border-blue-500 outline-none mr-2 focus:border-blue-500"
+          id="alto" type="number" placeholder="Alto">
+      </div>
+      <div class="flex flex-col">
+        <label for="ancho" class="font-bold">Ancho</label>
+        <input id="ancho"
+          class="border-2 border-blue-200 rounded-md p-2 hover:border-blue-500 outline-none mr-2 focus:border-blue-500"
+          id="alto" type="number" placeholder="Ancho">
+      </div>
     </div>
-    <div class="flex flex-row max-w-max overflow-auto max-h-128 my-2" id="contenedorFragmentos" ></div>
+    <div class="flex flex-row max-w-max overflow-auto max-h-128 my-2" id="contenedorFragmentos"></div>
 
 
     <p class="bg-blue-500 p-2 text-white rounded-md mt-2 max-w-max">
@@ -40,10 +46,10 @@
       máximo más allá del papel térmico)
     </p>
     <button id="imprimir"
-      class="bg-green-500 hover:bg-green-400 hover:cursor-pointer rounded-md text-white p-2 rounded-md max-w-max mt-2">Imprimir</button>
+      class="bg-green-500 hover:bg-green-400 hover:cursor-pointer rounded-md text-white p-2 rounded-md max-w-max mt-2">Imprimir
+      todos los fragmentos</button>
     <pre id="resultados"></pre>
   </div>
-  <canvas id="canvas"></canvas>
   <script type="module" src="/src/main.js"></script>
 </body>
 
