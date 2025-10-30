@@ -32,12 +32,10 @@ const llenarSelectImpresoras = async () => {
 llenarSelectImpresoras();
 const descargarColeccionDeCanvas = async (coleccionDeCanvas) => {
   const zip = new JSZip();
-  let i = 0;
-  for (const canvas of coleccionDeCanvas) {
-    i++;
+  for (let i = 0; i < coleccionDeCanvas.length; i++) {
+    const canvas = coleccionDeCanvas[i];
     const data = canvas.toDataURL("image/png").split(",")[1];
     zip.file(`imagen_${i}.png`, data, { base64: true });
-
   }
   const resultado = await zip.generateAsync({ type: "blob" });
   const url = URL.createObjectURL(resultado);
@@ -48,7 +46,10 @@ const descargarColeccionDeCanvas = async (coleccionDeCanvas) => {
   URL.revokeObjectURL(url);
 }
 $descargar.addEventListener("click", () => {
+  const textoOriginal = $descargar.textContent;
+  $descargar.textContent = "Descargando...";
   descargarColeccionDeCanvas([...document.querySelectorAll("canvas")]);
+  $descargar.textContent = textoOriginal;
 })
 const imprimirColeccionDeCanvas = (coleccionDeCanvas) => {
   const nombreImpresora = $impresoras.value;
@@ -117,23 +118,23 @@ const generarCanvasPrevisualizaciones = async () => {
   }
   const imagen = await createImageBitmap($imagen.files[0]);
   $contenedorFragmentos.replaceChildren();
-
-  const alto = $alto.valueAsNumber;
-  const ancho = $ancho.valueAsNumber;
+  const altoMaximoEstablecidoPorUsuario = $alto.valueAsNumber;
+  const anchoMaximoEstablecidoPorUsuario = $ancho.valueAsNumber;
   let numeroImagen = 1;
-  for (let x = 0; x < imagen.width; x += ancho) {
+  for (let xInicio = 0; xInicio < imagen.width; xInicio += anchoMaximoEstablecidoPorUsuario) {
     const $divRow = document.createElement("div");
     $divRow.classList.add("flex", "flex-col");
-    for (let y = 0; y < imagen.height; y += alto) {
-
-      let xFinalFragmento = x + ancho;
-      let yFinalFragmento = y + alto;
-      if (x + ancho > imagen.width) {
-        xFinalFragmento = imagen.width;
+    for (let yInicio = 0; yInicio < imagen.height; yInicio += altoMaximoEstablecidoPorUsuario) {
+      let ancho = anchoMaximoEstablecidoPorUsuario;
+      let alto = altoMaximoEstablecidoPorUsuario;
+      if (xInicio + anchoMaximoEstablecidoPorUsuario > imagen.width) {
+        ancho = imagen.width - xInicio;
       }
-      if (y + alto > imagen.height) {
-        yFinalFragmento = imagen.height;
+      if (yInicio + altoMaximoEstablecidoPorUsuario > imagen.height) {
+        alto = imagen.height - yInicio;
       }
+      const xFin = xInicio + ancho;
+      const yFin = yInicio + alto;
       const $divContenedorDeCanvas = document.createElement("div");
       $divContenedorDeCanvas.classList.add("border", "border-blue-200", "rounded-md", "relative", "inline-block");
       const $divAcciones = document.createElement("div");
@@ -146,7 +147,7 @@ const generarCanvasPrevisualizaciones = async () => {
         "p-2"
       )
       const $pDetalles = document.createElement("p");
-      $pDetalles.textContent = `#${numeroImagen} (Desde ${x},${y} hasta ${xFinalFragmento},${yFinalFragmento})`;
+      $pDetalles.textContent = `#${numeroImagen} (Desde ${xInicio},${yInicio} hasta ${xFin},${yFin})`;
 
       const $pDescargar = document.createElement("p");
       $pDescargar.textContent = `Descargar`;
@@ -157,18 +158,13 @@ const generarCanvasPrevisualizaciones = async () => {
         "hover:font-bold"
       );
       $pDescargar.addEventListener("click", () => {
-        console.log("Descargamos")
         let enlace = document.createElement('a');
         enlace.download = "Canvas como imagen.jpg";
         enlace.href = $canvasFragmento.toDataURL("image/jpeg", 1);
         enlace.click();
       })
-
-
-
       const $pImprimir = document.createElement("p");
       $pImprimir.textContent = `Imprimir`;
-
       $pImprimir.classList.add(
         "cursor-pointer",
         "underline",
@@ -185,7 +181,7 @@ const generarCanvasPrevisualizaciones = async () => {
       $canvasFragmento.width = ancho;
       $canvasFragmento.height = alto;
       const contextoCanvasRecienCreado = $canvasFragmento.getContext("2d");
-      contextoCanvasRecienCreado.drawImage(imagen, x, y, ancho, alto, 0, 0, ancho, alto);
+      contextoCanvasRecienCreado.drawImage(imagen, xInicio, yInicio, ancho, alto, 0, 0, ancho, alto);
       $divContenedorDeCanvas.append($canvasFragmento)
       $divRow.append($divContenedorDeCanvas);
       numeroImagen++;
@@ -202,6 +198,7 @@ $imagen.addEventListener("change", async () => {
 $alto.addEventListener("change", generarCanvasPrevisualizaciones)
 $ancho.addEventListener("change", generarCanvasPrevisualizaciones)
 $imprimir.addEventListener("click", async () => {
+  const textoOriginal = $imprimir.textContent;
   if ($imagen.files.length <= 0) {
     registrarMensaje("No has seleccionado ninguna imagen");
     return;
@@ -211,5 +208,7 @@ $imprimir.addEventListener("click", async () => {
     return;
   }
   const todosLosCanvas = document.querySelectorAll("canvas");
+  $imprimir.textContent = "Imprimiendo...";
   await imprimirColeccionDeCanvas([...todosLosCanvas]);
+  $imprimir.textContent = textoOriginal;
 })
