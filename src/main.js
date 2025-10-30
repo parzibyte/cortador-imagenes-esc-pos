@@ -1,4 +1,5 @@
 import "./style.css"
+import JSZip from "jszip"
 const $imagen = document.querySelector("#imagen");
 const $alto = document.querySelector("#alto");
 const $ancho = document.querySelector("#ancho");
@@ -6,6 +7,7 @@ const $resultados = document.querySelector("#resultados");
 const $imprimir = document.querySelector("#imprimir");
 const $impresoras = document.querySelector("#impresoras");
 const $contenedorFragmentos = document.querySelector("#contenedorFragmentos");
+const $descargar = document.querySelector("#descargar");
 $ancho.value = 384; // Por defecto para 58mm
 
 const registrarMensaje = (mensaje) => {
@@ -28,7 +30,27 @@ const llenarSelectImpresoras = async () => {
   }
 }
 llenarSelectImpresoras();
-const imprimirFragmentoDeImagen = (coleccionDeCanvas) => {
+const descargarColeccionDeCanvas = async (coleccionDeCanvas) => {
+  const zip = new JSZip();
+  let i = 0;
+  for (const canvas of coleccionDeCanvas) {
+    i++;
+    const data = canvas.toDataURL("image/png").split(",")[1];
+    zip.file(`imagen_${i}.png`, data, { base64: true });
+
+  }
+  const resultado = await zip.generateAsync({ type: "blob" });
+  const url = URL.createObjectURL(resultado);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "imagenes.zip";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+$descargar.addEventListener("click", () => {
+  descargarColeccionDeCanvas([...document.querySelectorAll("canvas")]);
+})
+const imprimirColeccionDeCanvas = (coleccionDeCanvas) => {
   const nombreImpresora = $impresoras.value;
   return new Promise(async (resolve, reject) => {
     const operaciones = [
@@ -153,7 +175,7 @@ const generarCanvasPrevisualizaciones = async () => {
         "hover:font-bold"
       );
       $pImprimir.addEventListener("click", async () => {
-        await imprimirFragmentoDeImagen([$canvasFragmento]);
+        await imprimirColeccionDeCanvas([$canvasFragmento]);
       })
       $divAcciones.appendChild($pDetalles);
       $divAcciones.appendChild($pDescargar);
@@ -189,5 +211,5 @@ $imprimir.addEventListener("click", async () => {
     return;
   }
   const todosLosCanvas = document.querySelectorAll("canvas");
-  await imprimirFragmentoDeImagen([...todosLosCanvas]);
+  await imprimirColeccionDeCanvas([...todosLosCanvas]);
 })
